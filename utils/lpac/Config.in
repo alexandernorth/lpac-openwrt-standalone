@@ -1,0 +1,36 @@
+if PACKAGE_lpac
+
+menu "LPAC APDU backend support"
+
+config LPAC_WITH_APDU_AT
+	bool "Include APDU AT Backend support"
+	default y
+
+config LPAC_WITH_APDU_MBIM
+	bool "Include APDU MBIM Backend support"
+	default y
+	select PACKAGE_libmbim
+
+config LPAC_WITH_APDU_PCSC
+	bool "Include APDU PCSC Backend support"
+	default n
+	select PACKAGE_libpcsclite
+	select PACKAGE_pcscd
+
+config LPAC_WITH_APDU_QMI
+	bool "Include APDU QMI Backend support"
+	default n
+	select PACKAGE_qmi-utils
+
+config LPAC_WITH_APDU_QMI_QRTR
+	bool "Include APDU QMI QRTR Backend support"
+	default n
+	select PACKAGE_qmi-utils
+
+config LPAC_WITH_APDU_UQMI
+	bool "Include APDU UQMI Backend support"
+	default y
+	select PACKAGE_uqmi
+
+endmenu
+endif
