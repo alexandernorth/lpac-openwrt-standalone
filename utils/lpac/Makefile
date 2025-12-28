@@ -24,12 +24,11 @@ PKG_CONFIG_DEPENDS:= \
   CONFIG_LPAC_WITH_APDU_UQMI
 
 PKG_BUILD_DEPENDS:= \
-  +LPAC_WITH_PCSC:libpcsclite \
-  +LPAC_WITH_PCSC:pcscd \
+  +LPAC_WITH_PCSC:pcsc-lite \
   +LPAC_WITH_MBIM:libmbim \
   +LPAC_WITH_APDU_QMI:libqmi \
   +LPAC_WITH_APDU_QMI_QRTR:libqmi \
-  +libcurl-gnutls
+  libcurl-gnutls
 
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
@@ -39,6 +38,7 @@ define Package/lpac
   CATEGORY:=Utilities
   TITLE:=eUICC eSIM LPA written in C
   DEPENDS:= \
+    +LPAC_WITH_PCSC:pcscd \
     +libcurl-gnutls \
     +ca-bundle
   URL:=https://github.com/estkme-group/lpac
