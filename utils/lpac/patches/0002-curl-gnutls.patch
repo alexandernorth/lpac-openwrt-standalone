@@ -1,22 +1,31 @@
 diff --git a/driver/CMakeLists.txt b/driver/CMakeLists.txt
-index 9f8e6e7..2e9b7a7 100644
+index 901d927..dd9ab9d 100644
 --- a/driver/CMakeLists.txt
 +++ b/driver/CMakeLists.txt
-@@ -178,7 +178,16 @@ if(LPAC_WITH_HTTP_CURL)
-         target_link_libraries(driver_http_curl PRIVATE ${DL_LIBRARY})
+@@ -125,13 +125,25 @@ if(LPAC_WITH_HTTP_CURL)
+         target_link_libraries(euicc-drivers ${DL_LIBRARY})
      else()
          find_package(CURL REQUIRED)
--        target_link_libraries(driver_http_curl PRIVATE curl)
+-        target_link_libraries(euicc-drivers curl)
 +        if (TARGET CURL::libcurl)
-+            target_link_libraries(driver_http_curl PRIVATE CURL::libcurl)
++            target_link_libraries(euicc-drivers CURL::libcurl)
 +        else()
-+            target_include_directories(driver_http_curl PRIVATE ${CURL_INCLUDE_DIRS} ${CURL_INCLUDE_DIR})
++            target_include_directories(euicc-drivers PRIVATE ${CURL_INCLUDE_DIRS} ${CURL_INCLUDE_DIR})
 +            if (CURL_LIBRARY)
-+                target_link_libraries(driver_http_curl PRIVATE ${CURL_LIBRARY})
++                target_link_libraries(euicc-drivers ${CURL_LIBRARY})
 +            else()
-+                target_link_libraries(driver_http_curl PRIVATE ${CURL_LIBRARIES})
++                target_link_libraries(euicc-drivers ${CURL_LIBRARIES})
 +            endif()
 +        endif()
++
+         if(LPAC_DYNAMIC_DRIVERS)
++            # Keep this as "libcurl" unless you *know* your distro uses a different pc name
+             list(APPEND LIBEUICC_DRIVERS_REQUIRES "libcurl")
+         endif()
      endif()
-     install(TARGETS driver_http_curl LIBRARY DESTINATION ${DRIVER_INSTALL_PATH})
  endif()
+
++
+ if(LPAC_DYNAMIC_DRIVERS)
+     # Install headers
+     file(GLOB ALL_HEADERS "*.h")
