@@ -2,9 +2,9 @@
 import argparse
 import os
 import re
+import shutil
 import subprocess
 import sys
-import shutil
 from collections import deque
 from typing import Deque, Optional, Set
 
@@ -29,28 +29,50 @@ def readelf_needed(readelf: str, elf_path: str) -> list[str]:
 
 
 def find_library(libs_dir: str, name: str) -> Optional[str]:
-    """Search libs_dir recursively for a file whose basename == name; return realpath if found."""
+    """
+    Search libs_dir recursively for a file whose basename == name.
+    Returns the realpath if found, otherwise None.
+    """
     for root, _, files in os.walk(libs_dir):
         if name in files:
             return os.path.realpath(os.path.join(root, name))
     return None
 
 
-def deps_bfs(readelf: str, binary: str, libs_dir: str) -> list[str]:
-    """Return full paths of all libraries (direct + transitive) needed by `binary` within `libs_dir`."""
+def resolve_readelf(platformprefix: str) -> str:
+    """
+    Accept either:
+      - a prefix like 'aarch64-linux-gnu-' (searched in PATH)
+      - or a prefix path like '/opt/tc/bin/aarch64-linux-gnu-'
+    Returns a path or executable name suitable for subprocess.
+    """
+    candidate = platformprefix + "readelf"
+    if os.path.isabs(candidate) or os.sep in candidate:
+        return candidate
+    return shutil.which(candidate) or candidate
+
+
+def deps_bfs(readelf: str, binary: str, libs_dir: str, skip_names: Set[str]) -> list[str]:
+    """
+    Return full paths of all libraries (direct + transitive) needed by `binary`,
+    resolved by searching within `libs_dir`. Libraries whose *basename* is in
+    skip_names are neither printed nor traversed.
+    """
     seen_paths: Set[str] = set()
     out: list[str] = []
     q: Deque[str] = deque()
 
-    # Cache library-name -> resolved path (or None) to avoid repeated directory walks
+    # Cache name -> resolved path (or None) to avoid repeated directory walks
     resolve_cache: dict[str, Optional[str]] = {}
 
     def resolve(name: str) -> Optional[str]:
+        if name in skip_names:
+            return None
         if name not in resolve_cache:
             resolve_cache[name] = find_library(libs_dir, name)
         return resolve_cache[name]
 
-    # Seed with direct deps (included)
+    # Seed with direct dependencies (included)
     for name in readelf_needed(readelf, binary):
         p = resolve(name)
         if not p or p in seen_paths:
@@ -73,19 +95,6 @@ def deps_bfs(readelf: str, binary: str, libs_dir: str) -> list[str]:
     return out
 
 
-def resolve_readelf(platformprefix: str) -> str:
-    """
-    Accept either:
-      - a prefix like 'aarch64-linux-gnu-' (searched in PATH)
-      - or a prefix path like '/opt/tc/bin/aarch64-linux-gnu-'
-    """
-    candidate = platformprefix + "readelf"
-    if os.path.isabs(candidate) or os.sep in candidate:
-        return candidate
-    found = shutil.which(candidate)
-    return found or candidate  # fall back; later check will error nicely
-
-
 def main() -> int:
     ap = argparse.ArgumentParser(
         description="Print full paths of direct+transitive DT_NEEDED libraries of an ELF binary, resolved within a libs directory."
@@ -96,24 +105,41 @@ def main() -> int:
         help="Cross prefix for binutils (e.g. 'aarch64-linux-gnu-' or '/opt/tc/bin/aarch64-linux-gnu-')",
     )
     ap.add_argument("libs_dir", help="Directory containing libraries (searched recursively)")
+    ap.add_argument(
+        "--skip",
+        action="append",
+        default=[],
+        help="Library basename to skip (repeatable), e.g. --skip libc.so.6",
+    )
     args = ap.parse_args()
 
     binary = os.path.abspath(args.binary)
     readelf = resolve_readelf(args.platformprefix)
     libs_dir = os.path.abspath(args.libs_dir)
+    skip_names = set(args.skip)
 
     if not os.path.isfile(binary):
         print(f"error: binary not found: {binary}", file=sys.stderr)
         return 2
-    if not (os.path.isfile(readelf) or shutil.which(readelf)):
+
+    # If readelf is not an explicit path, shutil.which already ran in resolve_readelf,
+    # but keep a simple check for nicer errors.
+    if (os.sep in readelf or os.path.isabs(readelf)) and not os.path.isfile(readelf):
         print(f"error: readelf not found: {readelf}", file=sys.stderr)
         return 2
     if not os.path.isdir(libs_dir):
         print(f"error: libs_dir not a directory: {libs_dir}", file=sys.stderr)
         return 2
 
-    for p in deps_bfs(readelf, binary, libs_dir):
+    try:
+        deps = deps_bfs(readelf, binary, libs_dir, skip_names)
+    except RuntimeError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+
+    for p in deps:
         print(p)
+
     return 0
 
 
