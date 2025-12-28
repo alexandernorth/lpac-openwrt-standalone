@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import fnmatch
 import os
 import re
 import shutil
@@ -7,7 +8,6 @@ import subprocess
 import sys
 from collections import deque
 from typing import Deque, Optional, Set
-import fnmatch
 
 
 NEEDED_RE = re.compile(r"\(NEEDED\)\s+Shared library:\s+\[(.+?)\]")
@@ -29,23 +29,11 @@ def readelf_needed(readelf: str, elf_path: str) -> list[str]:
     return NEEDED_RE.findall(out)
 
 
-def find_library(libs_dir: str, name: str) -> Optional[str]:
-    """
-    Search libs_dir recursively for a file whose basename == name.
-    Returns the realpath if found, otherwise None.
-    """
-    for root, _, files in os.walk(libs_dir):
-        if name in files:
-            return os.path.realpath(os.path.join(root, name))
-    return None
-
-
 def resolve_readelf(platformprefix: str) -> str:
     """
     Accept either:
       - a prefix like 'aarch64-linux-gnu-' (searched in PATH)
       - or a prefix path like '/opt/tc/bin/aarch64-linux-gnu-'
-    Returns a path or executable name suitable for subprocess.
     """
     candidate = platformprefix + "readelf"
     if os.path.isabs(candidate) or os.sep in candidate:
@@ -54,32 +42,39 @@ def resolve_readelf(platformprefix: str) -> str:
 
 
 def matches_skip(name: str, skip_patterns: list[str]) -> bool:
-    """Return True if library basename matches any skip pattern."""
-    for pat in skip_patterns:
-        if fnmatch.fnmatch(name, pat):
-            return True
-    return False
+    """Return True if library basename matches any skip glob pattern."""
+    return any(fnmatch.fnmatch(name, pat) for pat in skip_patterns)
 
 
-def deps_bfs(
-    readelf: str,
-    binary: str,
-    libs_dir: str,
-    skip_patterns: list[str],
-) -> list[str]:
+def find_library(libs_dir: str, name: str) -> Optional[str]:
+    """
+    Search libs_dir recursively for a file whose basename == name.
+
+    IMPORTANT: returns the path as found (may be a symlink). This lets `cp -L`
+    decide whether to dereference it.
+    """
+    for root, _, files in os.walk(libs_dir):
+        if name in files:
+            return os.path.join(root, name)  # DO NOT realpath()
+    return None
+
+
+def deps_bfs(readelf: str, binary: str, libs_dir: str, skip_patterns: list[str]) -> list[str]:
     """
     Return full paths of all libraries (direct + transitive) needed by `binary`,
-    resolved by searching within `libs_dir`.
+    resolved within `libs_dir`.
 
-    Libraries whose basename matches any skip pattern are:
-      - not printed
-      - not traversed
+    Output paths may be symlinks (e.g. libfoo.so.4). Use `cp -L` to copy real files.
+
+    Dedupe/cycle detection is done by realpath() of each found library so the same
+    underlying file is not returned multiple times through different symlinks.
     """
-    seen_paths: Set[str] = set()
     out: list[str] = []
     q: Deque[str] = deque()
 
-    # Cache name -> resolved path (or None) to avoid repeated directory walks
+    seen_real: Set[str] = set()
+
+    # Cache libname -> found path (or None) to avoid repeated walks
     resolve_cache: dict[str, Optional[str]] = {}
 
     def resolve(name: str) -> Optional[str]:
@@ -89,12 +84,15 @@ def deps_bfs(
             resolve_cache[name] = find_library(libs_dir, name)
         return resolve_cache[name]
 
-    # Seed with direct dependencies
+    # Seed with direct deps (included)
     for name in readelf_needed(readelf, binary):
         p = resolve(name)
-        if not p or p in seen_paths:
+        if not p:
             continue
-        seen_paths.add(p)
+        real = os.path.realpath(p)
+        if real in seen_real:
+            continue
+        seen_real.add(real)
         out.append(p)
         q.append(p)
 
@@ -103,9 +101,12 @@ def deps_bfs(
         elf = q.popleft()
         for name in readelf_needed(readelf, elf):
             p = resolve(name)
-            if not p or p in seen_paths:
+            if not p:
                 continue
-            seen_paths.add(p)
+            real = os.path.realpath(p)
+            if real in seen_real:
+                continue
+            seen_real.add(real)
             out.append(p)
             q.append(p)
 
@@ -138,23 +139,19 @@ def main() -> int:
     if not os.path.isfile(binary):
         print(f"error: binary not found: {binary}", file=sys.stderr)
         return 2
-
     if (os.sep in readelf or os.path.isabs(readelf)) and not os.path.isfile(readelf):
         print(f"error: readelf not found: {readelf}", file=sys.stderr)
         return 2
-
     if not os.path.isdir(libs_dir):
         print(f"error: libs_dir not a directory: {libs_dir}", file=sys.stderr)
         return 2
 
     try:
-        deps = deps_bfs(readelf, binary, libs_dir, skip_patterns)
+        for p in deps_bfs(readelf, binary, libs_dir, skip_patterns):
+            print(p)
     except RuntimeError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
-
-    for p in deps:
-        print(p)
 
     return 0
 
