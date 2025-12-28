@@ -28,7 +28,7 @@ PKG_BUILD_DEPENDS:= \
   +LPAC_WITH_PCSC:pcscd \
   +LPAC_WITH_MBIM:libmbim \
   +LPAC_WITH_APDU_QMI:libqmi \
-  +LPAC_WITH_APDU_QMI_QRTR:qmi-utils
+  +LPAC_WITH_APDU_QMI_QRTR:libqmi
 
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
