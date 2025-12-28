@@ -104,6 +104,10 @@ define Package/lpac/install
 				fi; \
 			done; \
 		done
+		
+	$(CP) -L $(STAGING_DIR)/usr/lib/libffi.so.*        $(1)/usr/lib/lpac/ 2>/dev/null || true
+	$(CP) -L $(STAGING_DIR)/usr/lib/libgmodule-2.0.so.* $(1)/usr/lib/lpac/ 2>/dev/null || true
+	$(CP) -L $(STAGING_DIR)/usr/lib/libpcre2-8.so.*    $(1)/usr/lib/lpac/ 2>/dev/null || true
 # 	$(CP) -L $(STAGING_DIR)/usr/lib/libmbedtls.so.*    $(1)/usr/lib/lpac/ 2>/dev/null || true
 # 	$(CP) -L $(STAGING_DIR)/usr/lib/libmbedx509.so.*   $(1)/usr/lib/lpac/ 2>/dev/null || true
 # 	$(CP) -L $(STAGING_DIR)/usr/lib/libmbedcrypto.so.* $(1)/usr/lib/lpac/ 2>/dev/null || true
