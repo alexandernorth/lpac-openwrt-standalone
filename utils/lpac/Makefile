@@ -93,8 +93,8 @@ define Package/lpac/install
 	# bundle all DT_NEEDED shared libs next to the binary
 	@echo "=== bundling libs ==="
 
-	@python3 ./files/bundle-lpac-deps.py "$(1)/usr/bin/lpac/lpac" "$(TARGET_CROSS)" "$(STAGING_DIR)"
-	@python3 ./files/bundle-lpac-deps.py "$(1)/usr/bin/lpac/lpac" "$(TARGET_CROSS)" "$(STAGING_DIR)" | xargs -d '\n' -I{} $(CP) -L "{}" "$(1)/usr/lib/lpac/""
+	@python3 ./files/bundle-lpac-deps.py "$(1)/usr/bin/lpac/lpac" "$(TARGET_CROSS)" "$(STAGING_DIR)" --skip 'libcurl.so*'
+	@python3 ./files/bundle-lpac-deps.py "$(1)/usr/bin/lpac/lpac" "$(TARGET_CROSS)" "$(STAGING_DIR)" --skip 'libcurl.so*' | xargs -d '\n' -I{} $(CP) -L "{}" "$(1)/usr/lib/lpac/""
 
 	@echo "=== packaged payload ==="
 	@ls -l $(1)/usr/lib/lpac || true

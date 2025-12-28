@@ -7,6 +7,7 @@ import subprocess
 import sys
 from collections import deque
 from typing import Deque, Optional, Set
+import fnmatch
 
 
 NEEDED_RE = re.compile(r"\(NEEDED\)\s+Shared library:\s+\[(.+?)\]")
@@ -52,11 +53,27 @@ def resolve_readelf(platformprefix: str) -> str:
     return shutil.which(candidate) or candidate
 
 
-def deps_bfs(readelf: str, binary: str, libs_dir: str, skip_names: Set[str]) -> list[str]:
+def matches_skip(name: str, skip_patterns: list[str]) -> bool:
+    """Return True if library basename matches any skip pattern."""
+    for pat in skip_patterns:
+        if fnmatch.fnmatch(name, pat):
+            return True
+    return False
+
+
+def deps_bfs(
+    readelf: str,
+    binary: str,
+    libs_dir: str,
+    skip_patterns: list[str],
+) -> list[str]:
     """
     Return full paths of all libraries (direct + transitive) needed by `binary`,
-    resolved by searching within `libs_dir`. Libraries whose *basename* is in
-    skip_names are neither printed nor traversed.
+    resolved by searching within `libs_dir`.
+
+    Libraries whose basename matches any skip pattern are:
+      - not printed
+      - not traversed
     """
     seen_paths: Set[str] = set()
     out: list[str] = []
@@ -66,13 +83,13 @@ def deps_bfs(readelf: str, binary: str, libs_dir: str, skip_names: Set[str]) -> 
     resolve_cache: dict[str, Optional[str]] = {}
 
     def resolve(name: str) -> Optional[str]:
-        if name in skip_names:
+        if matches_skip(name, skip_patterns):
             return None
         if name not in resolve_cache:
             resolve_cache[name] = find_library(libs_dir, name)
         return resolve_cache[name]
 
-    # Seed with direct dependencies (included)
+    # Seed with direct dependencies
     for name in readelf_needed(readelf, binary):
         p = resolve(name)
         if not p or p in seen_paths:
@@ -109,30 +126,29 @@ def main() -> int:
         "--skip",
         action="append",
         default=[],
-        help="Library basename to skip (repeatable), e.g. --skip libc.so.6",
+        help="Library basename glob to skip (repeatable), e.g. --skip 'libc.so.*'",
     )
     args = ap.parse_args()
 
     binary = os.path.abspath(args.binary)
     readelf = resolve_readelf(args.platformprefix)
     libs_dir = os.path.abspath(args.libs_dir)
-    skip_names = set(args.skip)
+    skip_patterns = args.skip
 
     if not os.path.isfile(binary):
         print(f"error: binary not found: {binary}", file=sys.stderr)
         return 2
 
-    # If readelf is not an explicit path, shutil.which already ran in resolve_readelf,
-    # but keep a simple check for nicer errors.
     if (os.sep in readelf or os.path.isabs(readelf)) and not os.path.isfile(readelf):
         print(f"error: readelf not found: {readelf}", file=sys.stderr)
         return 2
+
     if not os.path.isdir(libs_dir):
         print(f"error: libs_dir not a directory: {libs_dir}", file=sys.stderr)
         return 2
 
     try:
-        deps = deps_bfs(readelf, binary, libs_dir, skip_names)
+        deps = deps_bfs(readelf, binary, libs_dir, skip_patterns)
     except RuntimeError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
