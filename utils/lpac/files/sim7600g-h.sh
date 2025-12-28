@@ -33,4 +33,6 @@ minicom -o -D "$DEV" -S "$script" -C "$log" </dev/null >/dev/null 2>&1 || {
   exit 1
 }
 
-echo "OK (see $log)"
+echo "==== Modem response ===="
+cat "$log"
+echo "========================"

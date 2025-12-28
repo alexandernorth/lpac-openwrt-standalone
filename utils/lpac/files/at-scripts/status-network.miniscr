@@ -1,31 +1,26 @@
 send "AT\r"
 expect {
-  "OK" break
-  "ERROR" goto fail
+  "OK"    print "AT: OK\n"
+  "ERROR" print "AT: ERROR\n"
 }
 
 send "AT+CREG?\r"
 expect {
-  "OK" goto done
-  "ERROR" goto fail
+  "OK"    print "AT+CREG?: OK\n"
+  "ERROR" print "AT+CREG?: ERROR\n"
 }
 
 send "AT+COPS?\r"
 expect {
-  "OK" goto done
-  "ERROR" goto fail
+  "OK"    print "AT+COPS?: OK\n"
+  "ERROR" print "AT+COPS?: ERROR\n"
 }
 
 send "AT+CSQ\r"
 expect {
-  "OK" goto done
-  "ERROR" goto fail
+  "OK"    print "AT+CSQ: OK\n"
+  "ERROR" print "AT+CSQ: ERROR\n"
 }
 
-fail:
-print "Command failed.\n"
-exit 1
-
-done:
 print "Done.\n"
 exit 0
