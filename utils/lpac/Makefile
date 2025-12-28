@@ -89,30 +89,12 @@ define Package/lpac/install
 
 	@echo "STAGING_DIR=$(STAGING_DIR)"
 	@$(TARGET_CROSS)readelf -d $(PKG_INSTALL_DIR)/usr/bin/lpac | grep NEEDED || true
-	@ls -l $(STAGING_DIR)/usr/lib/libcurl.so.* 2>/dev/null || true
 
 	# bundle all DT_NEEDED shared libs next to the binary
 	@echo "=== bundling libs ==="
-	@set -x; \
-		bin="$(PKG_INSTALL_DIR)/usr/bin/lpac"; \
-		for lib in $$$$($(TARGET_CROSS)readelf -d "$$$$bin" | awk -F'[][]' '/NEEDED/ {print $$$$2}'); do \
-			for d in $(STAGING_DIR)/usr/lib $(STAGING_DIR)/lib; do \
-				if [ -e "$$$$d/$$$$lib" ]; then \
-					echo "COPY $$$$d/$$$$lib -> $(1)/usr/lib/lpac/"; \
-					$(CP) -L "$$$$d/$$$$lib" "$(1)/usr/lib/lpac/"; \
-					break; \
-				fi; \
-			done; \
-		done
-		
-	$(CP) -L $(STAGING_DIR)/usr/lib/libffi.so.*        $(1)/usr/lib/lpac/ 2>/dev/null || true
-	$(CP) -L $(STAGING_DIR)/usr/lib/libgmodule-2.0.so.* $(1)/usr/lib/lpac/ 2>/dev/null || true
-	$(CP) -L $(STAGING_DIR)/usr/lib/libpcre2-8.so.*    $(1)/usr/lib/lpac/ 2>/dev/null || true
-# 	$(CP) -L $(STAGING_DIR)/usr/lib/libmbedtls.so.*    $(1)/usr/lib/lpac/ 2>/dev/null || true
-# 	$(CP) -L $(STAGING_DIR)/usr/lib/libmbedx509.so.*   $(1)/usr/lib/lpac/ 2>/dev/null || true
-# 	$(CP) -L $(STAGING_DIR)/usr/lib/libmbedcrypto.so.* $(1)/usr/lib/lpac/ 2>/dev/null || true
-# 	$(CP) -L $(STAGING_DIR)/usr/lib/libz.so.*          $(1)/usr/lib/lpac/ 2>/dev/null || true
-# 	$(CP) -L $(STAGING_DIR)/usr/lib/libnghttp2.so.*    $(1)/usr/lib/lpac/ 2>/dev/null || true
+
+	@python3 ./files/bundle-lpac-deps.py "$(1)/usr/bin/lpac/lpac" "$(TARGET_CROSS)" "$(STAGING_DIR)"
+	@python3 ./files/bundle-lpac-deps.py "$(1)/usr/bin/lpac/lpac" "$(TARGET_CROSS)" "$(STAGING_DIR)" | xargs -d '\n' -I{} $(CP) -L "{}" "$(1)/usr/lib/lpac/""
 
 	@echo "=== packaged payload ==="
 	@ls -l $(1)/usr/lib/lpac || true
