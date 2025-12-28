@@ -1,19 +1,21 @@
 diff --git a/driver/CMakeLists.txt b/driver/CMakeLists.txt
-index 9f8e6e7..6d07d1b 100644
+index 9f8e6e7..2e9b7a7 100644
 --- a/driver/CMakeLists.txt
 +++ b/driver/CMakeLists.txt
-@@ -178,7 +178,14 @@ if(LPAC_WITH_HTTP_CURL)
+@@ -178,7 +178,16 @@ if(LPAC_WITH_HTTP_CURL)
          target_link_libraries(driver_http_curl PRIVATE ${DL_LIBRARY})
      else()
          find_package(CURL REQUIRED)
 -        target_link_libraries(driver_http_curl PRIVATE curl)
-+        # Prefer the modern imported target from FindCURL
 +        if (TARGET CURL::libcurl)
 +            target_link_libraries(driver_http_curl PRIVATE CURL::libcurl)
 +        else()
-+            # Fallback for older FindCURL modules
-+            target_include_directories(driver_http_curl PRIVATE ${CURL_INCLUDE_DIRS})
-+            target_link_libraries(driver_http_curl PRIVATE ${CURL_LIBRARIES})
++            target_include_directories(driver_http_curl PRIVATE ${CURL_INCLUDE_DIRS} ${CURL_INCLUDE_DIR})
++            if (CURL_LIBRARY)
++                target_link_libraries(driver_http_curl PRIVATE ${CURL_LIBRARY})
++            else()
++                target_link_libraries(driver_http_curl PRIVATE ${CURL_LIBRARIES})
++            endif()
 +        endif()
      endif()
      install(TARGETS driver_http_curl LIBRARY DESTINATION ${DRIVER_INSTALL_PATH})
