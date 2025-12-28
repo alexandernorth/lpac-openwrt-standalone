@@ -1,0 +1,18 @@
+send "AT\r"
+expect {
+  "OK" break
+  "ERROR" goto fail
+}
+send "AT+CUSBPIDSWITCH=9011,1,1\r"
+expect {
+  "OK" goto done
+  "ERROR" goto fail
+}
+
+fail:
+print "Command failed.\n"
+exit 1
+
+done:
+print "Done.\n"
+exit 0

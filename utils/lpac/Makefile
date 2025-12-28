@@ -40,7 +40,8 @@ define Package/lpac
   DEPENDS:= \
     +LPAC_WITH_APDU_PCSC:pcscd \
     +libcurl-gnutls \
-    +ca-bundle
+    +ca-bundle \
+    +minicom
   URL:=https://github.com/estkme-group/lpac
 endef
 
@@ -78,6 +79,7 @@ define Package/lpac/install
 	# wrapper
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) ./files/lpac.sh $(1)/usr/bin/lpac
+	$(INSTALL_BIN) ./files/sim7600g-h.sh $(1)/usr/bin/sim7600g-h
 
 	# config
 	$(INSTALL_DIR) $(1)/etc/config
@@ -86,6 +88,7 @@ define Package/lpac/install
 	# payload dir
 	$(INSTALL_DIR) $(1)/usr/lib/lpac
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/lpac $(1)/usr/lib/lpac/lpac
+	$(CP) ./files/at-scripts $(1)/usr/lib/lpac/
 
 	@echo "STAGING_DIR=$(STAGING_DIR)"
 	@$(TARGET_CROSS)readelf -d $(PKG_INSTALL_DIR)/usr/bin/lpac | grep NEEDED || true
@@ -93,8 +96,8 @@ define Package/lpac/install
 	# bundle all DT_NEEDED shared libs next to the binary
 	@echo "=== bundling libs ==="
 
-	@python3 ./files/bundle-lpac-deps.py "$(1)/usr/bin/lpac/lpac" "$(TARGET_CROSS)" "$(STAGING_DIR)" --skip 'libcurl.so*'
-	@python3 ./files/bundle-lpac-deps.py "$(1)/usr/bin/lpac/lpac" "$(TARGET_CROSS)" "$(STAGING_DIR)" --skip 'libcurl.so*' | xargs -d '\n' -I{} $(CP) -L "{}" "$(1)/usr/lib/lpac/""
+	@python3 ./files/bundle-lpac-deps.py "$(PKG_INSTALL_DIR)/usr/bin/lpac" "$(TARGET_CROSS)" "$(STAGING_DIR)" --skip 'libcurl.so*'
+	@python3 ./files/bundle-lpac-deps.py "$(PKG_INSTALL_DIR)/usr/bin/lpac" "$(TARGET_CROSS)" "$(STAGING_DIR)" --skip 'libcurl.so*' | xargs -d '\n' -I{} $(CP) -L "{}" "$(1)/usr/lib/lpac/""
 
 	@echo "=== packaged payload ==="
 	@ls -l $(1)/usr/lib/lpac || true
